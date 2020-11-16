@@ -9,7 +9,6 @@
 import json
 import re
 import time
-from pprint import pprint
 from typing import List, Tuple
 
 import pandas as pd
@@ -28,19 +27,30 @@ class Duty:
     year = time.strftime("%Y", time.localtime())
 
     def __init__(self):
-        self.holidays = self.get_holidays()
-        self.peoples = self.__get_duty_people_range()
+        # 获取考勤的目标月份
         self.current_month = self.__get_current_month()
+        # 获取当月假期 日期列表
+        self.holidays = self.get_holidays()
+        # 获取考勤目标人员名单
+        self.peoples = self.__get_duty_people_range()
+        # 获取当月 公休天数
+        self.expect_holidays_count = len(self.holidays)
+        # 获取当月 应出勤天数
+        self.expect_work_days_count = self.__get_expect_days_count() - self.expect_holidays_count
 
-    @staticmethod
-    def get_holidays() -> list:
+    def get_holidays(self) -> list:
         """
-        获取全年假日日期列表
+        获取当月假日日期列表
         :return:
         """
         with open('./holidays.json', 'r') as f:
-            dates = f.read()
-        return json.loads(dates)
+            dates = json.load(f)
+        # "20200905"
+        current_month_holidays = []
+        for date in dates:
+            if int(date[4:6]) == self.current_month:
+                current_month_holidays.append(date)
+        return current_month_holidays
 
     @staticmethod
     def __get_current_month() -> int:
@@ -51,6 +61,18 @@ class Duty:
         wb = load_workbook(r'./datas/1.xlsx')
         ws = wb["月度汇总"]
         return int(str(ws['A1'].value)[-5:-3])
+
+    def __get_expect_days_count(self) -> int:
+        """
+        获取当月自然日天数
+        :return:
+        """
+        start_month = f'{self.year}{self.current_month}01' if self.current_month >= 10 else f'{self.year}0{self.current_month}01'
+        end_month = f'{self.year}{self.current_month + 1}01' if self.current_month + 1 >= 10 else f'{self.year}0{self.current_month + 1}01'
+        current_month_dates = pd.date_range(start=start_month, end=end_month)
+        current_month_dates = [pd.Timestamp(x).strftime("%Y%m%d") for x in current_month_dates.values]
+        current_month_dates.pop()
+        return len(current_month_dates)
 
     def __get_duty_people_range(self) -> Index:
         """
@@ -113,7 +135,9 @@ class Duty:
             '工作日加班': gzr_jbs,
             '假日加班': jr_jbs,
             '出差': real_ccs,
-            '工作天数': ruzhi_infos[1],
+            '实际出勤天数': ruzhi_infos[1],
+            '公休天数': self.expect_holidays_count,
+            '应该出勤天数': self.expect_work_days_count,
             '入职信息': ruzhi_infos
 
         }
@@ -232,7 +256,7 @@ class Duty:
         :param df2:
         :return:
         """
-        real_work_days_count = 23
+        real_work_days_count = self.expect_work_days_count
         is_ruzhi_current_month = False
         no_offer_days = list(df2[df2['班次'] == '不在考勤组']['日期'].values)
         if len(no_offer_days) != 0:
@@ -264,7 +288,11 @@ class Duty:
 
 def main():
     duty = Duty()
-    pprint(duty.get_duty_datas())
+    datas = duty.get_duty_datas()
+    # pprint(datas)
+    with open('./results.json', 'w', encoding='utf-8') as f:
+        f.write(json.dumps(datas, ensure_ascii=False))
+    print('执行完毕')
 
 
 if __name__ == '__main__':
