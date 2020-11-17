@@ -19,14 +19,14 @@ from utils import get_days
 
 
 class Duty:
-    # 1. 获取到了需要统计的人员名单 （排除不在考勤组的，排除销售的）
-    df1 = pd.read_excel('./datas/1.xlsx', skiprows=2)
-    # 1. 读取考勤数据 每日统计
-    df2 = pd.read_excel('./datas/1.xlsx', skiprows=2, sheet_name='每日统计')
-    # 获取当前年份
-    year = time.strftime("%Y", time.localtime())
 
     def __init__(self):
+        # 1. 获取到了需要统计的人员名单 （排除不在考勤组的，排除销售的）
+        self.df1 = pd.read_excel('./datas/1.xlsx', skiprows=2, sheet_name='月度汇总')
+        # 1. 读取考勤数据 每日统计
+        self.df2 = pd.read_excel('./datas/1.xlsx', skiprows=2, sheet_name='每日统计')
+        # 获取当前年份
+        self.year = time.strftime("%Y", time.localtime())
         # 获取考勤的目标月份
         self.current_month = self.__get_current_month()
         # 获取当月假期 日期列表

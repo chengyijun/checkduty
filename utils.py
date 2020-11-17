@@ -6,9 +6,30 @@
 @time: 2020/11/4 16:23
 @desc:
 """
+import os
 import re
 
 import pandas as pd
+
+
+def delete_target_dir(target_dir: str):
+    """
+    清空一个路径 递归删除其下的所有文件和文件夹
+    :param target_dir:
+    :return:
+    """
+    if not os.path.exists(target_dir):
+        return
+    files = os.listdir(target_dir)
+    for file in files:
+        file = os.path.join(target_dir, file)
+        if os.path.isfile(file):
+            os.remove(file)
+        elif os.path.isdir(file):
+            delete_target_dir(file)
+        else:
+            print('参数错误')
+    os.removedirs(target_dir)
 
 
 def get_days(start: str, end: str, current_month: int) -> int:

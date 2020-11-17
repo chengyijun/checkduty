@@ -35,8 +35,8 @@ class Rule:
                 # {'D5': '张宽', 'T5': 25, 'U5': 375, 'V5': 25, 'W5': 217.39, 'X5': 7, 'Y5': 23, 'Z5': 23}
                 ws[item[0]] = item[1]
 
-        wb.save(r'./datas/考勤结果.xlsx')
-        print('处理完毕')
+        wb.save(r'./static/考勤结果.xlsx')
+        # print('处理完毕')
 
     @staticmethod
     def __get_results_by_rules(results: list) -> list:
