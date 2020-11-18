@@ -8,8 +8,10 @@
 """
 import json
 import re
+from typing import Tuple
 
 from openpyxl import load_workbook
+from openpyxl.styles import Alignment
 
 
 def main():
@@ -33,13 +35,15 @@ class Rule:
         for data in datas:
             for item in data.items():
                 # {'D5': '张宽', 'T5': 25, 'U5': 375, 'V5': 25, 'W5': 217.39, 'X5': 7, 'Y5': 23, 'Z5': 23}
-                ws[item[0]] = item[1]
+                if 'AA' in str(item[0]):
+                    # 备注信息靠左对齐
+                    ws[item[0]].alignment = Alignment(horizontal='left', vertical='center')
+                ws[item[0]] = str(item[1])
 
         wb.save(r'./static/考勤结果.xlsx')
         # print('处理完毕')
 
-    @staticmethod
-    def __get_results_by_rules(results: list) -> list:
+    def __get_results_by_rules(self, results: list) -> list:
         """
         根据考勤规则 计算个人的结果
         :param result:
@@ -47,48 +51,32 @@ class Rule:
         """
         datas = []
         for row, result in enumerate(results, start=5):
-            jb_cb_count = 0
-            jb_jb_count = 0
             # 备注信息
             beizhus = []
 
             # 工作日加班  餐补+1
-            jzr_jbs = result['工作日加班']
-            if jzr_jbs:
-                for jzr_jb in jzr_jbs:
-                    gp = re.search(r'\s(\d+(\.\d+)?)小时', jzr_jb)
-                    if gp:
-                        if float(gp.group(1)) > 2.0:
-                            # 有效加班
-                            jb_cb_count += 1
-
+            cb1 = self.deal_jzrjb(result)
             # 公休日加班 餐补+1 交补+1
-            jr_jbs = result['假日加班']
-            if jr_jbs:
-                for jr_jb in jr_jbs:
-                    gp = re.search(r'\s(\d+(\.\d+)?)小时', jr_jb)
-                    if gp:
-                        if float(gp.group(1)) > 2.0:
-                            # 有效加班
-                            jb_cb_count += 1
-                            jb_jb_count += 1
+            cb2, jb1 = self.deal_jrjb(result)
+            jb_cb_count = cb1 + cb2
+            jb_jb_count = jb1
 
-            # 提取入职信息
-            if result['入职信息'][0]:
-                beizhu = '入职：' + result['入职信息'][2]
-                beizhus.append(beizhu)
-
+            # 提取入职信息 加入备注
+            self.deal_ruzhi(beizhus, result)
             # 提取缺卡信息
-            temps = []
-            if result['缺卡']:
-                for qk in result['缺卡']:
-                    temps.append(qk.split(' ')[0][3:])
-                beizhus.append('缺卡：' + ' '.join(temps))
+            self.deal_queka(beizhus, result)
             # 提取补卡信息
-            if result['补卡']:
-                for bk in result['补卡']:
-                    temps.append(bk.split(' ')[0][3:])
-                beizhus.append('补卡：' + ' '.join(temps))
+            self.deal_buka(beizhus, result)
+
+            # 处理出差  餐补-1 交补-1
+            cc_count = self.deal_cc(beizhus, result)
+
+            jb_jb_count -= cc_count
+            jb_cb_count -= cc_count
+
+            beizhu_str = ' '.join(beizhus) if beizhus else ''
+            print(beizhu_str)
+
             # 写结果到模版文件
             data = {
                 f'D{row}': result['姓名'],
@@ -99,10 +87,105 @@ class Rule:
                 f'X{row}': result['公休天数'],
                 f'Y{row}': result['应该出勤天数'],
                 f'Z{row}': result['实际出勤天数'],
-                f'AA{row}': ' '.join(beizhus)
+                f'AA{row}': beizhu_str
             }
             datas.append(data)
+
         return datas
+
+    def deal_buka(self, beizhus: list, result: dict) -> None:
+        """
+        处理补卡
+        :param beizhus:
+        :param result:
+        :return:
+        """
+        temps = []
+        if result['补卡']:
+            for bk in result['补卡']:
+                temps.append(bk.split(' ')[0][3:])
+            beizhus.append('补卡：' + ' '.join(temps))
+
+    def deal_queka(self, beizhus: list, result: dict) -> None:
+        """
+        处理缺卡
+        :param beizhus:
+        :param result:
+        :return:
+        """
+        temps = []
+        if result['缺卡']:
+            for qk in result['缺卡']:
+                temps.append(qk.split(' ')[0][3:])
+            beizhus.append('缺卡：' + ' '.join(temps))
+
+    def deal_ruzhi(self, beizhus: list, result: dict):
+        """
+        如果有入职信息，则加入备注列表
+        :param beizhus:
+        :param result:
+        :return:
+        """
+        if result['入职信息'][0]:
+            beizhu = '入职：' + result['入职信息'][2]
+            beizhus.append(beizhu)
+
+    def deal_jrjb(self, result: dict) -> Tuple[int, int]:
+        """
+        处理假日加班的餐补交补
+        :param result:
+        :return:
+        """
+        jb_cb_count = 0
+        jb_jb_count = 0
+        jr_jbs = result['假日加班']
+        if jr_jbs:
+            for jr_jb in jr_jbs:
+                gp = re.search(r'\s(\d+(\.\d+)?)小时', jr_jb)
+                if gp:
+                    if float(gp.group(1)) > 2.0:
+                        # 有效加班
+                        jb_cb_count += 1
+                        jb_jb_count += 1
+        return jb_cb_count, jb_jb_count
+
+    def deal_jzrjb(self, result: dict) -> int:
+        """
+        处理工作日加班的餐补交补
+        :param result:
+        :return:
+        """
+        jb_cb_count = 0
+        jzr_jbs = result['工作日加班']
+        if jzr_jbs:
+            for jzr_jb in jzr_jbs:
+                gp = re.search(r'\s(\d+(\.\d+)?)小时', jzr_jb)
+                if gp:
+                    if float(gp.group(1)) > 2.0:
+                        # 有效加班
+                        jb_cb_count += 1
+        return jb_cb_count
+
+    def deal_cc(self, beizhus: list, result: dict) -> int:
+        """
+        处理出差
+        :param beizhus:
+        :param result:
+        :return:
+        """
+        # "出差09-03 08:30到09-03 18:00 1天"
+        cc_count = 0
+        ccs = result['出差']
+        if ccs:
+            for cc in ccs:
+                try:
+                    gp = re.search(r'\s(\d+)天', cc)
+                except Exception as e:
+                    print(e)
+                else:
+                    cc_count += int(gp.group(1))
+            beizhus.append(f'出差：{cc_count}天')
+        return cc_count
 
 
 if __name__ == '__main__':
