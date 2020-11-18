@@ -38,7 +38,7 @@ class Rule:
                 if 'AA' in str(item[0]):
                     # 备注信息靠左对齐
                     ws[item[0]].alignment = Alignment(horizontal='left', vertical='center')
-                ws[item[0]] = str(item[1])
+                ws[item[0]] = item[1]
 
         wb.save(r'./static/考勤结果.xlsx')
         # print('处理完毕')
@@ -75,7 +75,6 @@ class Rule:
             jb_cb_count -= cc_count
 
             beizhu_str = ' '.join(beizhus) if beizhus else ''
-            print(beizhu_str)
 
             # 写结果到模版文件
             data = {
