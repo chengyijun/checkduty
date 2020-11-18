@@ -47,7 +47,7 @@ def result():
             'info': '未上传excel'
         }
         return jsonify(data)
-    from test5 import Duty
+    from clean_data import Duty
 
     duty = Duty()
     datas = duty.get_duty_datas()
