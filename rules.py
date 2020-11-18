@@ -14,10 +14,6 @@ from openpyxl import load_workbook
 from openpyxl.styles import Alignment
 
 
-def main():
-    Rule()
-
-
 class Rule:
     def __init__(self):
         self.write_result()
@@ -46,7 +42,7 @@ class Rule:
     def __get_results_by_rules(self, results: list) -> list:
         """
         根据考勤规则 计算个人的结果
-        :param result:
+        :param results:
         :return:
         """
         datas = []
@@ -55,25 +51,29 @@ class Rule:
             beizhus = []
 
             # 工作日加班  餐补+1
-            cb1 = self.deal_jzrjb(result)
+            cb1 = self.__deal_jzrjb(result)
             # 公休日加班 餐补+1 交补+1
-            cb2, jb1 = self.deal_jrjb(result)
+            cb2, jb1 = self.__deal_jrjb(result)
             jb_cb_count = cb1 + cb2
             jb_jb_count = jb1
 
             # 提取入职信息 加入备注
-            self.deal_ruzhi(beizhus, result)
+            self.__deal_ruzhi(beizhus, result)
             # 提取缺卡信息
-            self.deal_queka(beizhus, result)
+            self.__deal_queka(beizhus, result)
             # 提取补卡信息
-            self.deal_buka(beizhus, result)
+            self.__deal_buka(beizhus, result)
 
             # 处理出差  餐补-1 交补-1
-            cc_count = self.deal_cc(beizhus, result)
+            cc_count = self.__deal_cc(beizhus, result)
 
             jb_jb_count -= cc_count
             jb_cb_count -= cc_count
 
+            # 处理事假
+            self.__deal_sj(beizhus, result)
+
+            # 处理备注信息
             beizhu_str = ' '.join(beizhus) if beizhus else ''
 
             # 写结果到模版文件
@@ -92,7 +92,7 @@ class Rule:
 
         return datas
 
-    def deal_buka(self, beizhus: list, result: dict) -> None:
+    def __deal_buka(self, beizhus: list, result: dict) -> None:
         """
         处理补卡
         :param beizhus:
@@ -105,7 +105,7 @@ class Rule:
                 temps.append(bk.split(' ')[0][3:])
             beizhus.append('补卡：' + ' '.join(temps))
 
-    def deal_queka(self, beizhus: list, result: dict) -> None:
+    def __deal_queka(self, beizhus: list, result: dict) -> None:
         """
         处理缺卡
         :param beizhus:
@@ -118,7 +118,7 @@ class Rule:
                 temps.append(qk.split(' ')[0][3:])
             beizhus.append('缺卡：' + ' '.join(temps))
 
-    def deal_ruzhi(self, beizhus: list, result: dict):
+    def __deal_ruzhi(self, beizhus: list, result: dict):
         """
         如果有入职信息，则加入备注列表
         :param beizhus:
@@ -129,7 +129,7 @@ class Rule:
             beizhu = '入职：' + result['入职信息'][2]
             beizhus.append(beizhu)
 
-    def deal_jrjb(self, result: dict) -> Tuple[int, int]:
+    def __deal_jrjb(self, result: dict) -> Tuple[int, int]:
         """
         处理假日加班的餐补交补
         :param result:
@@ -148,7 +148,7 @@ class Rule:
                         jb_jb_count += 1
         return jb_cb_count, jb_jb_count
 
-    def deal_jzrjb(self, result: dict) -> int:
+    def __deal_jzrjb(self, result: dict) -> int:
         """
         处理工作日加班的餐补交补
         :param result:
@@ -165,7 +165,7 @@ class Rule:
                         jb_cb_count += 1
         return jb_cb_count
 
-    def deal_cc(self, beizhus: list, result: dict) -> int:
+    def __deal_cc(self, beizhus: list, result: dict) -> int:
         """
         处理出差
         :param beizhus:
@@ -185,6 +185,30 @@ class Rule:
                     cc_count += int(gp.group(1))
             beizhus.append(f'出差：{cc_count}天')
         return cc_count
+
+    def __deal_sj(self, beizhus: list, result: dict) -> None:
+        """
+        处理事假
+        :param beizhus:
+        :param result:
+        :return:
+        """
+
+        sj_count = 0
+        sjs = result['事假']
+        if sjs:
+            for sj in sjs:
+                try:
+                    gp = re.search(r'\s(\d+(.\d+)?)小时', sj)
+                except Exception as e:
+                    print(e)
+                else:
+                    sj_count += float(gp.group(1))
+            beizhus.append(f'扣除事假时薪：{sj_count}小时')
+
+
+def main():
+    Rule()
 
 
 if __name__ == '__main__':
