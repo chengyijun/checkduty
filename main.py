@@ -10,9 +10,10 @@ import json
 import os
 
 from flask import Flask, request, jsonify, Blueprint
-from flask_cors import CORS
 
 from utils import delete_target_dir
+
+# from flask_cors import CORS
 
 api = Blueprint('api', __name__)
 
@@ -70,7 +71,7 @@ def result():
 
 app = Flask(__name__)
 app.register_blueprint(api, url_prefix='/api')
-CORS(app, supports_credentials=True)
+# CORS(app, supports_credentials=True)
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0')
